@@ -1,0 +1,32 @@
+name: build
+on: { push: {}, workflow_dispatch: {} }
+jobs:
+  jar:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix: { target: ['26.3', '26.1.2'] }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '25' }
+      - uses: gradle/actions/setup-gradle@v4
+        with: { gradle-version: '9.2.0' }
+      - name: Unpack project.zip
+        run: unzip -q hollowwatch-source.zip -d work && ls work
+      - name: Tests and validator
+        working-directory: work/hollowwatch
+        run: |
+          mkdir -p out && javac -d out src/main/java/dev/hollowwatch/core/*.java src/test/java/CoreTest.java && java -cp out CoreTest
+          python3 tools/validate.py
+      - name: Select target
+        working-directory: work/hollowwatch
+        run: if [ "${{ matrix.target }}" = "26.1.2" ]; then cp gradle.properties.26.1 gradle.properties; fi
+      - name: Build jar
+        working-directory: work/hollowwatch
+        run: gradle build --stacktrace
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hollowwatch-mc${{ matrix.target }}
+          path: work/hollowwatch/build/libs/*.jar
+          
